@@ -4,70 +4,93 @@
 #include <array>
 #include <chrono>
 #include <filesystem>
+#include <future>
+#include <thread>
 #include "encryption/Encryption.h"
 
 using namespace encryption;
 
-const std::size_t CHUNK_SIZE = 4096; // Size of each chunk to read and process
+const std::size_t CHUNK_SIZE = 4096; // Size of each chunk to process in parallel
+
+void encryptChunk(const std::vector<uint8_t> &input, std::vector<uint8_t> &output, const Encryption &encryption,
+                  std::vector<uint8_t> &tag, size_t start) {
+    std::vector<uint8_t> aad; // Additional Authenticated Data (optional)
+    std::vector<uint8_t> buffer(input.begin() + start, input.begin() + std::min(input.size(), start + CHUNK_SIZE));
+    output = encryption.encrypt(buffer, aad, tag);
+    output.insert(output.end(), tag.begin(), tag.end());
+}
+
+void decryptChunk(const std::vector<uint8_t> &input, std::vector<uint8_t> &output, const Encryption &encryption,
+                  std::vector<uint8_t> &tag, size_t start) {
+    std::vector<uint8_t> aad; // Additional Authenticated Data (optional)
+    size_t chunkSize = std::min(input.size(), start + CHUNK_SIZE);
+    std::vector<uint8_t> buffer(input.begin() + start, input.begin() + chunkSize - tag.size());
+    std::vector<uint8_t> chunkTag(input.begin() + chunkSize - tag.size(), input.begin() + chunkSize);
+    output = encryption.decrypt(buffer, aad, chunkTag);
+}
 
 void processFileInPlace(const std::filesystem::path &filePath, Encryption &encryption, bool encrypt) {
-    std::fstream file(filePath, std::ios::in | std::ios::out | std::ios::binary);
-    if (!file) {
-        throw std::runtime_error("Unable to open file for reading and writing: " + filePath.string());
+    // Read the entire file into memory with retry mechanism
+    std::vector<uint8_t> fileContent;
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        std::ifstream file(filePath, std::ios::binary | std::ios::ate);
+        if (file) {
+            std::streamsize fileSize = file.tellg();
+            file.seekg(0, std::ios::beg);
+            fileContent.resize(fileSize);
+            if (file.read(reinterpret_cast<char *>(fileContent.data()), fileSize)) {
+                file.close();
+                break;
+            }
+        }
+        if (attempt < 4) {
+            std::cerr << "Unable to open file, retrying...\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        } else {
+            throw std::runtime_error("Unable to open file for reading: " + filePath.string());
+        }
     }
 
-    std::vector<uint8_t> aad; // Additional Authenticated Data (optional)
-    std::vector<uint8_t> tag(16); // Tag for encryption
-    std::vector<uint8_t> buffer(CHUNK_SIZE);
+    // Process the file content in parallel
+    size_t numChunks = (fileContent.size() + CHUNK_SIZE - 1) / CHUNK_SIZE;
+    std::vector<std::future<void> > futures;
+    std::vector<std::vector<uint8_t> > processedChunks(numChunks);
+    std::vector<std::vector<uint8_t> > tags(numChunks, std::vector<uint8_t>(16));
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    file.seekg(0, std::ios::end);
-    std::streampos fileSize = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    std::streampos position = 0;
-
-    while (position < fileSize) {
-        file.seekg(position);
-        file.read(reinterpret_cast<char *>(buffer.data()), CHUNK_SIZE);
-        std::streamsize bytesRead = file.gcount();
-        buffer.resize(bytesRead);
-
-        std::vector<uint8_t> processedChunk;
+    for (size_t i = 0; i < numChunks; ++i) {
+        size_t startIdx = i * CHUNK_SIZE;
         if (encrypt) {
-            processedChunk = encryption.encrypt(buffer, aad, tag);
-            // Append tag to the encrypted chunk
-            processedChunk.insert(processedChunk.end(), tag.begin(), tag.end());
+            futures.push_back(std::async(std::launch::async, encryptChunk, std::cref(fileContent),
+                                         std::ref(processedChunks[i]), std::cref(encryption), std::ref(tags[i]),
+                                         startIdx));
         } else {
-            if (buffer.size() < 16) {
-                throw std::runtime_error("File chunk too small to contain tag.");
-            }
-            std::vector<uint8_t> chunkTag(buffer.end() - 16, buffer.end());
-            buffer.resize(buffer.size() - 16);
-
-            processedChunk = encryption.decrypt(buffer, aad, chunkTag);
-        }
-
-        file.seekp(position);
-        file.write(reinterpret_cast<const char *>(processedChunk.data()), processedChunk.size());
-        position += bytesRead;
-    }
-
-    file.close();
-
-    // Rename the file if encrypting or decrypting
-    if (encrypt) {
-        std::filesystem::rename(filePath, filePath.string() + ".lolgetfck3d");
-    } else {
-        if (filePath.extension() == ".lolgetfck3d") {
-            std::filesystem::rename(filePath, filePath.stem());
+            futures.push_back(std::async(std::launch::async, decryptChunk, std::cref(fileContent),
+                                         std::ref(processedChunks[i]), std::cref(encryption), std::ref(tags[i]),
+                                         startIdx));
         }
     }
+
+    for (auto &f: futures) {
+        f.get();
+    }
+
+    // Write the processed content back to the file
+    std::ofstream outFile(filePath, std::ios::binary);
+    if (!outFile) {
+        throw std::runtime_error("Unable to open file for writing: " + filePath.string());
+    }
+
+    for (const auto &chunk: processedChunks) {
+        outFile.write(reinterpret_cast<const char *>(chunk.data()), chunk.size());
+    }
+    outFile.close();
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
-    std::cout << "File processed successfully in " << duration.count() << " seconds.\n";
+    std::cout << "File " << (encrypt ? "encrypted" : "decrypted") << " successfully in " << duration.count() <<
+            " seconds.\n";
 }
 
 int main() {

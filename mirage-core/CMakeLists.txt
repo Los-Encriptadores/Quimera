@@ -16,4 +16,6 @@ add_executable(mirage_core main.cpp
         encryption/methods/AES/SBox.h
         utils/math/RNG.cpp
         utils/math/RNG.h
+        file/FileHandler.cpp
+        file/FileHandler.h
 )

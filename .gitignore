@@ -1,0 +1,23 @@
+# Binaries for programs and tests
+*target/
+**/*.rs.bk
+
+# Built documentation
+*doc/
+
+Cargo.lock
+
+# Output of `cargo test` with --doc
+*.dSYM
+*.log
+
+# IDE and Editor settings
+.idea/
+*.iml
+.vscode/
+
+/*.rs.bk
+
+# Environment file
+*.env
+!.env.example
