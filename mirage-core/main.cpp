@@ -15,7 +15,7 @@ void createLargeFile(const std::string &fileName, std::size_t size) {
         std::cerr << "Failed to create file: " << fileName << std::endl;
         return;
     }
-    std::vector<unsigned char> buffer(1024 * 1024, 'A'); // 1MB buffer filled with 'A'
+    std::vector<unsigned char> buffer(100 * 1024 * 1024, 'A'); // 100MB buffer of 'A's
     for (std::size_t written = 0; written < size; written += buffer.size()) {
         outFile.write(reinterpret_cast<char *>(buffer.data()), buffer.size());
     }
@@ -38,7 +38,7 @@ int main() {
         const std::string inputFile = "largefile.dat";
 
         log("Creating a large file...");
-        createLargeFile(inputFile, 2000 * 1024 * 1024); // 2GB file
+        createLargeFile(inputFile, 1000 * 1024 * 1024); // 1GB file
 
         log("Encrypting the file...");
         auto startEncrypt = std::chrono::high_resolution_clock::now();
