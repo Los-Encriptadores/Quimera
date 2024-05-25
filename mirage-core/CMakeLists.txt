@@ -3,19 +3,22 @@ project(mirage_core)
 
 set(CMAKE_CXX_STANDARD 26)
 
+# Add libsodium paths
+set(LIBSODIUM_INCLUDE_DIR /opt/homebrew/opt/libsodium/include)
+set(LIBSODIUM_LIBRARY /opt/homebrew/opt/libsodium/lib/libsodium.dylib)
+
+# Include the directory for libsodium
+include_directories(${LIBSODIUM_INCLUDE_DIR})
+
+# Add the executable and the source files
 add_executable(mirage_core main.cpp
         encryption/Encryption.cpp
         encryption/Encryption.h
-        encryption/methods/AES/AESGCM128.cpp
-        encryption/methods/AES/AESGCM128.h
-        encryption/methods/AES/AES.cpp
-        encryption/methods/AES/AES.h
-        encryption/methods/AES/GF256.cpp
-        encryption/methods/AES/GF256.h
-        encryption/methods/AES/SBox.cpp
-        encryption/methods/AES/SBox.h
         utils/math/RNG.cpp
         utils/math/RNG.h
         file/FileHandler.cpp
         file/FileHandler.h
 )
+
+# Link libsodium library
+target_link_libraries(mirage_core ${LIBSODIUM_LIBRARY})

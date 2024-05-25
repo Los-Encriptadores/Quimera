@@ -2,43 +2,21 @@
 #define ENCRYPTION_H
 
 #include <vector>
-#include <array>
-#include <cstdint>
-#include <memory>
 
-namespace encryption {
-    class EncryptionMethod {
-    public:
-        virtual ~EncryptionMethod() = default;
+class Encryption {
+public:
+    Encryption();
 
-        virtual std::vector<uint8_t> encrypt(const std::vector<uint8_t> &plaintext,
-                                             const std::vector<uint8_t> &aad,
-                                             std::vector<uint8_t> &tag) = 0;
+    ~Encryption();
 
-        virtual std::vector<uint8_t> decrypt(const std::vector<uint8_t> &ciphertext,
-                                             const std::vector<uint8_t> &aad,
-                                             const std::vector<uint8_t> &tag) = 0;
-    };
+    void generateKey() const;
 
-    class Encryption {
-    public:
-        enum class Method {
-            AESGCM128
-        };
+    bool encryptFile(const std::string &inputFile) const;
 
-        explicit Encryption(Method method, const std::array<uint8_t, 16> &key);
+    bool decryptFile(const std::string &inputFile) const;
 
-        std::vector<uint8_t> encrypt(const std::vector<uint8_t> &plaintext,
-                                     const std::vector<uint8_t> &aad,
-                                     std::vector<uint8_t> &tag) const;
-
-        std::vector<uint8_t> decrypt(const std::vector<uint8_t> &ciphertext,
-                                     const std::vector<uint8_t> &aad,
-                                     const std::vector<uint8_t> &tag) const;
-
-    private:
-        std::unique_ptr<EncryptionMethod> method_;
-    };
-}
+private:
+    unsigned char *key;
+};
 
 #endif // ENCRYPTION_H
