@@ -38,7 +38,7 @@ int main() {
         const std::string inputFile = "largefile.dat";
 
         log("Creating a large file...");
-        createLargeFile(inputFile, 1000 * 1024 * 1024); // 1GB file
+        createLargeFile(inputFile, 10000 * 1024 * 1024); // 10GB file
 
         log("Encrypting the file...");
         auto startEncrypt = std::chrono::high_resolution_clock::now();
@@ -65,6 +65,13 @@ int main() {
             deleteFile(inputFile);
             return 1;
         }
+
+        // Demonstrating the new hashing functionality
+        const std::string message = "This is a test message.";
+        log("Hashing the message: " + message);
+        std::string hash = Encryption::hashMessage(message);
+        log("Hashed message: " + hash);
+
         deleteFile(inputFile);
     } catch (const std::exception &e) {
         log(std::string("An error occurred: ") + e.what());

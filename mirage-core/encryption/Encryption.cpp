@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sodium.h>
+#include <sstream>
 #include <vector>
 
 // File extension for encrypted files
@@ -42,6 +43,19 @@ void Encryption::generateKey() const {
     crypto_secretstream_xchacha20poly1305_keygen(key);
     // Protect the encryption key from being accessed
     sodium_mprotect_noaccess(key);
+}
+
+// Method to hash a message
+std::string Encryption::hashMessage(const std::string &message) {
+    unsigned char hash[crypto_generichash_BYTES];
+    crypto_generichash(hash, sizeof hash, reinterpret_cast<const unsigned char *>(message.c_str()), message.size(),
+                       nullptr, 0);
+
+    std::stringstream hexStream;
+    for (unsigned char i: hash) {
+        hexStream << std::hex << std::setw(2) << std::setfill('0') << (int) i;
+    }
+    return hexStream.str();
 }
 
 // Returns the size of a file
