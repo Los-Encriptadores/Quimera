@@ -1,7 +1,7 @@
 #ifndef ENCRYPTION_H
 #define ENCRYPTION_H
 
-#include <vector>
+#include <string>
 
 class Encryption {
 public:
@@ -11,9 +11,9 @@ public:
 
     void generateKey() const;
 
-    bool encryptFile(const std::string &inputFile) const;
+    [[nodiscard]] bool encryptFile(const std::string &inputFile) const;
 
-    bool decryptFile(const std::string &inputFile) const;
+    [[nodiscard]] bool decryptFile(const std::string &inputFile) const;
 
 private:
     unsigned char *key;
