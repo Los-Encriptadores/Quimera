@@ -1,7 +1,3 @@
-//
-// Created by Daniel M on 23/05/2024.
-//
-
 #ifndef RNG_H
 #define RNG_H
 
@@ -21,8 +17,8 @@ namespace utils::math {
     private:
         std::array<uint8_t, 32> generateCombinedSeed();
 
-        static void enhanceSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed,
-                                                 const std::vector<uint8_t> &lorenzEntropy);
+        static void xorSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed,
+                                             const std::vector<uint8_t> &lorenzEntropy);
 
         static std::vector<uint8_t> generateRandomizedLorenzEntropy(size_t steps,
                                                                     const std::tuple<double, double, double>

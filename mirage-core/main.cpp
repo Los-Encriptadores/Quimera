@@ -2,80 +2,122 @@
 #include <fstream>
 #include <chrono>
 #include <vector>
+#include <random>
+
+#define MIN_FILE_SIZE 100 // in MB
+#define MAX_FILE_SIZE 1000 // in MB
+#define NUM_FILES 2
+#define FILES_PREFIX "mirage-test-file-"
+#define FILE_EXTENSION ".dat"
+#define ENCRYPTED_EXTENSION ".crypt"
+#define BASE_BUFFER_SIZE (64 * 1024) // 64KB
 
 #include "encryption/Encryption.h"
 
-void log(const std::string &message) {
-    std::cout << message << std::endl;
+// Function to generate random data
+void generateRandomData(std::vector<char> &buffer) {
+    const size_t size = buffer.size();
+    for (size_t i = 0; i < size; ++i) {
+        buffer[i] = static_cast<char>(random() % 256);
+    }
 }
 
-void createLargeFile(const std::string &fileName, std::size_t size) {
-    std::ofstream outFile(fileName, std::ios::binary);
-    if (!outFile.is_open()) {
-        std::cerr << "Failed to create file: " << fileName << std::endl;
-        return;
+void createMultipleLargeFiles(const size_t fileSizeMin = MIN_FILE_SIZE, const size_t fileSizeMax = MAX_FILE_SIZE) {
+    std::cout << "* Creating " << NUM_FILES << " large files (" << fileSizeMin << "MB - " << fileSizeMax << "MB)" <<
+            std::endl;
+    std::size_t totalSize = 0;
+    for (size_t i = 0; i < NUM_FILES; ++i) {
+        const std::string fileName = std::string(FILES_PREFIX).append(std::to_string(i)).append(FILE_EXTENSION);
+        const size_t fileSizeMB = fileSizeMin + rand() % (fileSizeMax - fileSizeMin + 1); // in MB
+        const size_t fileSize = fileSizeMB * 1024 * 1024; // in bytes
+        std::cout << "  - Creating file " << fileName << " (" << fileSizeMB << "MB)" << std::endl;
+        totalSize += fileSize;
+
+        std::ofstream outFile(fileName, std::ios::binary);
+        if (!outFile) {
+            std::cerr << "Failed to create file: " << fileName << std::endl;
+            return;
+        }
+
+        std::vector<char> buffer(BASE_BUFFER_SIZE);
+        size_t bytesWritten = 0;
+        while (bytesWritten < fileSize) {
+            generateRandomData(buffer);
+            size_t bytesToWrite = std::min(buffer.size(), fileSize - bytesWritten);
+            outFile.write(buffer.data(), bytesToWrite);
+            bytesWritten += bytesToWrite;
+        }
+
+        outFile.close();
+        std::cout << "  + File created" << std::endl;
     }
-    std::vector<unsigned char> buffer(100 * 1024 * 1024, 'A'); // 100MB buffer of 'A's
-    for (std::size_t written = 0; written < size; written += buffer.size()) {
-        outFile.write(reinterpret_cast<char *>(buffer.data()), buffer.size());
-    }
-    std::cout << "File created successfully" << std::endl;
-    outFile.close();
+
+    std::cout << "+ Files created, total size:" << (totalSize / (1024 * 1024)) << "MB" << std::endl;
 }
 
-void deleteFile(const std::string &file) {
-    log("Deleting the file...");
-    std::remove(file.c_str());
-    std::remove((file + ".lol").c_str());
-    std::cout << "File deleted" << std::endl;
+void encryptFiles(const Encryption &encryption) {
+    for (size_t i = 0; i < NUM_FILES; ++i) {
+        const std::string fileName = std::string(FILES_PREFIX).append(std::to_string(i)).append(FILE_EXTENSION);
+        auto start = std::chrono::high_resolution_clock::now();
+        if (encryption.encryptFile(fileName)) {
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> elapsed = end - start;
+            std::cout << "  - File encrypted: " << fileName << " (" << elapsed.count() << "ms)" << std::endl;
+        } else {
+            std::cerr << "Failed to encrypt file: " << fileName << std::endl;
+        }
+    }
+}
+
+void decryptFiles(const Encryption &encryption) {
+    for (size_t i = 0; i < NUM_FILES; ++i) {
+        const std::string encryptedFileName = std::string(FILES_PREFIX).append(std::to_string(i)).append(FILE_EXTENSION)
+                .append(ENCRYPTED_EXTENSION);
+        auto start = std::chrono::high_resolution_clock::now();
+        if (encryption.decryptFile(encryptedFileName)) {
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::duration<double, std::milli> elapsed = end - start;
+            std::cout << "  - File decrypted: " << encryptedFileName << " (" << elapsed.count() << "ms)" << std::endl;
+        } else {
+            std::cerr << "Failed to decrypt file: " << encryptedFileName << std::endl;
+        }
+    }
 }
 
 int main() {
-    try {
-        Encryption encryption;
-        encryption.generateKey();
+    createMultipleLargeFiles();
 
-        const std::string inputFile = "largefile.dat";
+    Encryption encryption;
+    encryption.generateAndHashKey();
 
-        log("Creating a large file...");
-        createLargeFile(inputFile, 10000 * 1024 * 1024); // 10GB file
+    std::cout << "Encrypting test files..." << std::endl;
+    auto start = std::chrono::high_resolution_clock::now();
+    encryptFiles(encryption);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::cout << "Total encryption time: " << std::chrono::duration<double, std::milli>(end - start).count() << "ms"
+            << std::endl;
 
-        log("Encrypting the file...");
-        auto startEncrypt = std::chrono::high_resolution_clock::now();
-        if (encryption.encryptFile(inputFile)) {
-            auto endEncrypt = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsedEncrypt = endEncrypt - startEncrypt;
-            log("Encryption successful");
-            log("Time taken for encryption: " + std::to_string(elapsedEncrypt.count()) + " seconds");
+    std::cout << "Decrypting test files..." << std::endl;
+    start = std::chrono::high_resolution_clock::now();
+    decryptFiles(encryption);
+    end = std::chrono::high_resolution_clock::now();
+    std::cout << "Total decryption time: " << std::chrono::duration<double, std::milli>(end - start).count() << "ms"
+            << std::endl;
+
+    std::cout << "* Deleting " << NUM_FILES << " test files" << std::endl;
+    for (size_t i = 0; i < NUM_FILES; ++i) {
+        const std::string fileName = std::string(FILES_PREFIX).append(std::to_string(i)).append(FILE_EXTENSION);
+        const std::string encryptedFileName = fileName + ENCRYPTED_EXTENSION;
+        if (remove(fileName.c_str()) != 0) {
+            std::cerr << "Failed to delete file: " << fileName << std::endl;
         } else {
-            log("Encryption failed");
-            deleteFile(inputFile);
-            return 1;
+            std::cout << fileName << "  + File deleted" << std::endl;
         }
-
-        log("Decrypting the file...");
-        auto startDecrypt = std::chrono::high_resolution_clock::now();
-        if (encryption.decryptFile(inputFile + ".lol")) {
-            auto endDecrypt = std::chrono::high_resolution_clock::now();
-            std::chrono::duration<double> elapsedDecrypt = endDecrypt - startDecrypt;
-            log("Decryption successful");
-            log("Time taken for decryption: " + std::to_string(elapsedDecrypt.count()) + " seconds");
+        if (remove(encryptedFileName.c_str()) != 0) {
+            std::cerr << "Failed to delete file: " << encryptedFileName << std::endl;
         } else {
-            log("Decryption failed");
-            deleteFile(inputFile);
-            return 1;
+            std::cout << encryptedFileName << "  + File deleted" << std::endl;
         }
-
-        // Demonstrating the new hashing functionality
-        const std::string message = "This is a test message.";
-        log("Hashing the message: " + message);
-        std::string hash = Encryption::hashMessage(message);
-        log("Hashed message: " + hash);
-
-        deleteFile(inputFile);
-    } catch (const std::exception &e) {
-        log(std::string("An error occurred: ") + e.what());
-        return 1;
     }
 
     return 0;

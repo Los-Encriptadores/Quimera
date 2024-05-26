@@ -1,7 +1,3 @@
-//
-// Created by Daniel M on 23/05/2024.
-//
-
 #include "RNG.h"
 #include <random>
 #include <algorithm>
@@ -22,10 +18,10 @@ namespace utils::math {
         std::array<uint8_t, 32> seed = generateCombinedSeed();
         constexpr u_int8_t STEPS = 100;
         const std::vector<uint8_t> lorenzEntropy = generateRandomizedLorenzEntropy(STEPS, {rng_(), rng_(), rng_()});
-        enhanceSeedWithLorenzEntropy(seed, lorenzEntropy);
+        xorSeedWithLorenzEntropy(seed, lorenzEntropy);
         shuffleSeed(seed);
 
-        std::uniform_int_distribution<int> dist(0, 255);
+        std::uniform_int_distribution dist(0, 255);
         for (auto &byte: buffer) {
             byte = dist(rng_);
         }
@@ -35,7 +31,7 @@ namespace utils::math {
         std::array<uint8_t, 32> seed = generateCombinedSeed();
 
         const std::vector<uint8_t> lorenzEntropy = generateRandomizedLorenzEntropy(STEPS, {rng_(), rng_(), rng_()});
-        enhanceSeedWithLorenzEntropy(seed, lorenzEntropy);
+        xorSeedWithLorenzEntropy(seed, lorenzEntropy);
         shuffleSeed(seed);
 
         std::uniform_int_distribution<int> dist(0, 255);
@@ -65,7 +61,7 @@ namespace utils::math {
         return combinedSeed;
     }
 
-    void RNG::enhanceSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed, const std::vector<uint8_t> &lorenzEntropy) {
+    void RNG::xorSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed, const std::vector<uint8_t> &lorenzEntropy) {
         for (size_t i = 0; i < lorenzEntropy.size(); ++i) {
             seed[i % 32] ^= lorenzEntropy[i];
         }
