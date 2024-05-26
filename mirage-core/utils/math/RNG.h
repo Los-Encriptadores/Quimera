@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <random>
+#include <vector>
 
 namespace utils::math {
     class RNG {
@@ -21,10 +22,12 @@ namespace utils::math {
                                              const std::vector<uint8_t> &lorenzEntropy);
 
         static std::vector<uint8_t> generateRandomizedLorenzEntropy(size_t steps,
-                                                                    const std::tuple<double, double, double>
-                                                                    &initialConditions);
+                                                                    const std::tuple<double, double, double> &
+                                                                    initialConditions);
 
         void shuffleSeed(std::array<uint8_t, 32> &seed);
+
+        void generateUniformBytes(auto &buffer);
 
         std::mt19937 rng_;
     };

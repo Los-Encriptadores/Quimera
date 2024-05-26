@@ -2,13 +2,18 @@
 #include <random>
 #include <algorithm>
 #include <functional>
+#include <sodium.h>
 
-constexpr u_int8_t STEPS = 100;
+constexpr uint8_t STEPS = 100;
 
 namespace utils::math {
     RNG::RNG() {
+        if (sodium_init() < 0) {
+            throw std::runtime_error("libsodium initialization failed");
+        }
+
         std::random_device rd;
-        std::array<uint32_t, std::mt19937::state_size> seed_data{};
+        std::array<uint32_t, std::mt19937_64::state_size> seed_data{};
         std::generate_n(seed_data.data(), seed_data.size(), std::ref(rd));
         std::seed_seq seq(seed_data.begin(), seed_data.end());
         rng_.seed(seq);
@@ -16,47 +21,34 @@ namespace utils::math {
 
     void RNG::generateRandomBytes(std::array<uint8_t, 12> &buffer) {
         std::array<uint8_t, 32> seed = generateCombinedSeed();
-        constexpr u_int8_t STEPS = 100;
         const std::vector<uint8_t> lorenzEntropy = generateRandomizedLorenzEntropy(STEPS, {rng_(), rng_(), rng_()});
         xorSeedWithLorenzEntropy(seed, lorenzEntropy);
         shuffleSeed(seed);
-
-        std::uniform_int_distribution dist(0, 255);
-        for (auto &byte: buffer) {
-            byte = dist(rng_);
-        }
+        generateUniformBytes(buffer);
     }
 
     void RNG::generateRandomBytes(std::vector<uint8_t> &buffer) {
         std::array<uint8_t, 32> seed = generateCombinedSeed();
-
         const std::vector<uint8_t> lorenzEntropy = generateRandomizedLorenzEntropy(STEPS, {rng_(), rng_(), rng_()});
         xorSeedWithLorenzEntropy(seed, lorenzEntropy);
         shuffleSeed(seed);
-
-        std::uniform_int_distribution<int> dist(0, 255);
         buffer.resize(buffer.size());
-        for (auto &byte: buffer) {
-            byte = dist(rng_);
-        }
+        generateUniformBytes(buffer);
     }
 
     std::array<uint8_t, 32> RNG::generateCombinedSeed() {
-        std::random_device rd;
+        std::array<uint8_t, 32> combinedSeed{};
         std::array<uint8_t, 32> osSeedBytes{};
-        for (auto &byte: osSeedBytes) {
-            byte = rd();
-        }
+        randombytes_buf(osSeedBytes.data(), osSeedBytes.size());
 
         std::array<uint8_t, 32> entropySeedBytes{};
-        for (auto &byte: entropySeedBytes) {
-            byte = rng_();
-        }
+        std::ranges::generate(entropySeedBytes, std::ref(rng_));
 
-        std::array<uint8_t, 32> combinedSeed{};
-        for (size_t i = 0; i < 32; ++i) {
-            combinedSeed[i] = osSeedBytes[i] ^ entropySeedBytes[i];
-        }
+        std::transform(osSeedBytes.begin(), osSeedBytes.end(), entropySeedBytes.begin(), combinedSeed.begin(),
+                       std::bit_xor<>());
+
+        sodium_memzero(osSeedBytes.data(), osSeedBytes.size());
+        sodium_memzero(entropySeedBytes.data(), entropySeedBytes.size());
 
         return combinedSeed;
     }
@@ -101,5 +93,12 @@ namespace utils::math {
 
     void RNG::shuffleSeed(std::array<uint8_t, 32> &seed) {
         std::ranges::shuffle(seed, rng_);
+    }
+
+    void RNG::generateUniformBytes(auto &buffer) {
+        std::uniform_int_distribution<int> dist(0, 255);
+        for (auto &byte: buffer) {
+            byte = dist(rng_);
+        }
     }
 }
