@@ -4,30 +4,23 @@
 #include <array>
 #include <cstdint>
 #include <random>
-#include <vector>
+#include <sodium.h>
 
 namespace utils::math {
     class RNG {
     public:
         RNG();
 
-        void generateRandomBytes(std::array<uint8_t, 12> &buffer);
-
-        void generateRandomBytes(std::vector<uint8_t> &buffer);
+        template<typename T>
+        T random(size_t count = 1);
 
     private:
-        std::array<uint8_t, 32> generateCombinedSeed();
+        std::array<uint8_t, 32> generateSeed();
 
-        static void xorSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed,
-                                             const std::vector<uint8_t> &lorenzEntropy);
+        static void mixSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed);
 
-        static std::vector<uint8_t> generateRandomizedLorenzEntropy(size_t steps,
-                                                                    const std::tuple<double, double, double> &
-                                                                    initialConditions);
-
-        void shuffleSeed(std::array<uint8_t, 32> &seed);
-
-        void generateUniformBytes(auto &buffer);
+        template<typename T>
+        void fillBufferWithRandomBytes(T &buffer, size_t size);
 
         std::mt19937 rng_;
     };
