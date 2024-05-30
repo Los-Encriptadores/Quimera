@@ -41,6 +41,7 @@ void PolymorphicEncryptionEngine::encryptFile(const std::string &inputFilename,
     size_t readLen;
     int eof;
     unsigned char tag;
+    size_t paddedLen;
 
     crypto_secretstream_xchacha20poly1305_init_push(&state, header, key);
     outputFile.write(reinterpret_cast<char *>(header), sizeof(header));
@@ -49,8 +50,17 @@ void PolymorphicEncryptionEngine::encryptFile(const std::string &inputFilename,
         inputFile.read(reinterpret_cast<char *>(bufferIn), sizeof(bufferIn));
         readLen = inputFile.gcount();
         eof = inputFile.eof();
+
+        if (eof) {
+            if (sodium_pad(&paddedLen, bufferIn, readLen, PADDING_BLOCK_SIZE, sizeof(bufferIn)) != 0) {
+                throw std::runtime_error("Padding failed");
+            }
+        } else {
+            paddedLen = readLen;
+        }
+
         tag = eof ? crypto_secretstream_xchacha20poly1305_TAG_FINAL : 0;
-        crypto_secretstream_xchacha20poly1305_push(&state, bufferOut, &outLen, bufferIn, readLen, nullptr, 0, tag);
+        crypto_secretstream_xchacha20poly1305_push(&state, bufferOut, &outLen, bufferIn, paddedLen, nullptr, 0, tag);
         outputFile.write(reinterpret_cast<char *>(bufferOut), outLen);
     } while (!eof);
 
@@ -69,11 +79,12 @@ void PolymorphicEncryptionEngine::decryptFile(const std::string &inputFilename,
     crypto_secretstream_xchacha20poly1305_state state;
     unsigned char header[crypto_secretstream_xchacha20poly1305_HEADERBYTES];
     unsigned char bufferIn[CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES];
-    unsigned char bufferOut[CHUNK_SIZE];
+    unsigned char bufferOut[CHUNK_SIZE + PADDING_BLOCK_SIZE];
     unsigned long long outLen;
     size_t readLen;
     int eof;
     unsigned char tag;
+    size_t unpaddedLen;
 
     inputFile.read(reinterpret_cast<char *>(header), sizeof(header));
     if (crypto_secretstream_xchacha20poly1305_init_pull(&state, header, key) != 0) {
@@ -88,7 +99,16 @@ void PolymorphicEncryptionEngine::decryptFile(const std::string &inputFilename,
             != 0) {
             throw std::runtime_error("Decryption failed");
         }
-        outputFile.write(reinterpret_cast<char *>(bufferOut), outLen);
+
+        if (eof && tag == crypto_secretstream_xchacha20poly1305_TAG_FINAL) {
+            if (sodium_unpad(&unpaddedLen, bufferOut, outLen, PADDING_BLOCK_SIZE) != 0) {
+                throw std::runtime_error("Unpadding failed");
+            }
+            outputFile.write(reinterpret_cast<char *>(bufferOut), unpaddedLen);
+        } else {
+            outputFile.write(reinterpret_cast<char *>(bufferOut), outLen);
+        }
+
         if (tag == crypto_secretstream_xchacha20poly1305_TAG_FINAL && !eof) {
             throw std::runtime_error("End of stream reached before end of file");
         }

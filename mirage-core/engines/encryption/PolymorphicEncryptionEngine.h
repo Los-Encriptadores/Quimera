@@ -5,6 +5,7 @@
 
 #define POLYMORPHIC_KEY_SIZE 16
 #define CHUNK_SIZE 4096
+#define PADDING_BLOCK_SIZE 16
 
 /**
  * @class PolymorphicEncryptionEngine
