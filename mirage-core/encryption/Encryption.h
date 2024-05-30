@@ -1,30 +1,28 @@
 #ifndef ENCRYPTION_H
 #define ENCRYPTION_H
 
-#include <string>
+#include <sodium.h>
+#include <cstddef>
 
 /**
  * @class Encryption
- * @brief This class provides methods for encryption and decryption of files using libsodium.
+ * @brief This class provides methods for encryption and decryption of data using libsodium.
  *
  * The Encryption class uses xChaCha20-Poly1305 for encryption and decryption. It provides methods to generate a key,
- * encrypt a file, and decrypt a file. The key is then hashed using BLAKE2b and stored in a protected memory space
- * and is inaccessible outside the class.
+ * encrypt a buffer, and decrypt a buffer.
  */
 class Encryption {
 public:
- Encryption();
+ explicit Encryption(const unsigned char *key);
 
  ~Encryption();
 
- void generateAndHashKey() const;
+ void encrypt(unsigned char *data, size_t size) const;
 
- [[nodiscard]] bool encryptFile(const std::string &inputFile) const;
-
- [[nodiscard]] bool decryptFile(const std::string &inputFile) const;
+ void decrypt(unsigned char *data, size_t size) const;
 
 private:
- unsigned char *key;
+ unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES]{};
 };
 
 #endif // ENCRYPTION_H
