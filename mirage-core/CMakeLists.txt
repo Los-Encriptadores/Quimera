@@ -21,6 +21,10 @@ add_executable(mirage_core main.cpp
         utils/math/LorenzAttractor.h
         utils/math/LatticeNoise.cpp
         utils/math/LatticeNoise.h
+        file/FileHandler.cpp
+        file/FileHandler.h
+        utils/crypto/CryptoStateHandler.cpp
+        utils/crypto/CryptoStateHandler.h
 )
 
 # Link libsodium library
