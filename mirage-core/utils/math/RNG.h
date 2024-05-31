@@ -12,7 +12,7 @@ namespace utils::math {
   * @brief A class for generating random numbers with enhanced entropy.
   *
   * This class utilizes both the standard random number generation and additional entropy
-  * from the Lorenz attractor to provide high-quality random numbers. It also uses libsodium
+  * from libsodium to provide high-quality random numbers. It also uses libsodium
   * for secure random number generation and memory handling.
   */
  class RNG {
@@ -30,7 +30,7 @@ namespace utils::math {
    *
    * This method generates random numbers of the specified integral type. The count parameter
    * specifies the number of random numbers to generate. The method uses a combination of
-   * generated seed, Lorenz entropy, and std::mt19937 to fill a buffer with random bytes.
+   * generated seed, libsodium entropy, and std::mt19937 to fill a buffer with random bytes.
    *
    * @tparam T The integral type of the random number to generate.
    * @param count The number of random numbers to generate (default is 1).

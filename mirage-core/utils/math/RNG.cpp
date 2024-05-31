@@ -1,11 +1,10 @@
 #include "RNG.h"
 #include "LorenzAttractor.h"
-
 #include <algorithm>
-#include <functional>
 #include <random>
 #include <sodium.h>
 #include <stdexcept>
+#include <vector>
 
 namespace utils::math {
     RNG::RNG() {
@@ -23,39 +22,25 @@ namespace utils::math {
     std::array<uint8_t, 32> RNG::generateSeed() {
         std::array<uint8_t, 32> seed{};
 
-        auto *osSeed = static_cast<uint8_t *>(sodium_malloc(32));
-        if (!osSeed) {
-            throw std::bad_alloc();
-        }
-        sodium_mprotect_readwrite(osSeed);
-
+        // Get OS entropy
+        uint8_t osSeed[32];
         randombytes_buf(osSeed, 32);
 
-        auto *entropySeed = static_cast<uint8_t *>(sodium_malloc(32));
-        if (!entropySeed) {
-            sodium_free(osSeed);
-            throw std::bad_alloc();
-        }
-        sodium_mprotect_readwrite(entropySeed);
+        // Get Lorenz attractor entropy
+        std::array<uint8_t, 32> lorenzEntropy{};
+        LorenzAttractor::generateEntropy(lorenzEntropy, 32);
 
-        std::generate_n(entropySeed, 32, std::ref(rng_));
-
-        std::transform(osSeed, osSeed + 32, entropySeed, seed.begin(), std::bit_xor());
-
-        sodium_memzero(osSeed, 32);
-        sodium_free(osSeed);
-
-        sodium_memzero(entropySeed, 32);
-        sodium_free(entropySeed);
+        // Mix OS entropy with Lorenz attractor entropy
+        std::transform(osSeed, osSeed + 32, lorenzEntropy.begin(), seed.begin(), std::bit_xor<>());
 
         return seed;
     }
 
     template<typename T>
     void RNG::fillBufferWithRandomBytes(T &buffer, const size_t size) {
-        std::uniform_int_distribution dist(0, 255);
+        std::uniform_int_distribution<int> dist(0, 255);
         for (size_t i = 0; i < size; ++i) {
-            buffer[i] = dist(rng_);
+            buffer[i] = static_cast<typename T::value_type>(dist(rng_));
         }
     }
 
@@ -63,24 +48,19 @@ namespace utils::math {
     T RNG::random(const size_t count) {
         static_assert(std::is_integral_v<T>, "T must be an integral type");
 
-        auto *buffer = static_cast<uint8_t *>(sodium_malloc(sizeof(T) * count));
-        if (!buffer) {
-            throw std::bad_alloc();
-        }
-        sodium_mprotect_readwrite(buffer);
+        std::vector<uint8_t> buffer(sizeof(T) * count);
 
         std::array<uint8_t, 32> seed = generateSeed();
-        LorenzAttractor::mixSeedWithLorenzEntropy(seed);
-        std::ranges::shuffle(seed, rng_);
+
+        std::seed_seq seq(seed.begin(), seed.end());
+        rng_.seed(seq);
+
         fillBufferWithRandomBytes(buffer, sizeof(T) * count);
 
         T result = 0;
         for (size_t i = 0; i < sizeof(T); ++i) {
-            result = (result << 8) | buffer[i];
+            result = result << 8 | buffer[i];
         }
-
-        sodium_memzero(buffer, sizeof(T) * count);
-        sodium_free(buffer);
 
         return result;
     }
@@ -92,4 +72,4 @@ namespace utils::math {
     template uint32_t RNG::random<uint32_t>(size_t count);
 
     template uint64_t RNG::random<uint64_t>(size_t count);
-}
+} // namespace utils::math
