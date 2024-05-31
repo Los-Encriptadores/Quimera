@@ -19,6 +19,10 @@ add_executable(mirage_core main.cpp
         engines/encryption/PolymorphicEncryptionEngine.cpp
         engines/encryption/IPolymorphicEncryptionEngine.h
         engines/encryption/PolymorphicEncryptionEngine.h
+        utils/math/LorenzAttractor.cpp
+        utils/math/LorenzAttractor.h
+        utils/math/LatticeNoise.cpp
+        utils/math/LatticeNoise.h
 )
 
 # Link libsodium library
