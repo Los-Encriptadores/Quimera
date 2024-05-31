@@ -12,8 +12,6 @@ include_directories(${LIBSODIUM_INCLUDE_DIR})
 
 # Add the executable and the source files
 add_executable(mirage_core main.cpp
-        encryption/Encryption.cpp
-        encryption/Encryption.h
         utils/math/RNG.cpp
         utils/math/RNG.h
         file/FileHandler.cpp
