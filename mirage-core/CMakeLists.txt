@@ -14,8 +14,6 @@ include_directories(${LIBSODIUM_INCLUDE_DIR})
 add_executable(mirage_core main.cpp
         utils/math/RNG.cpp
         utils/math/RNG.h
-        file/FileHandler.cpp
-        file/FileHandler.h
         engines/encryption/PolymorphicEncryptionEngine.cpp
         engines/encryption/IPolymorphicEncryptionEngine.h
         engines/encryption/PolymorphicEncryptionEngine.h
