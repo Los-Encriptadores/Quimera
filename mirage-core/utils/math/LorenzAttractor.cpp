@@ -1,36 +1,32 @@
 #include "LorenzAttractor.h"
 #include <cmath>
-#include <vector>
+
+#include "../../engines/encryption/PolymorphicEncryptionEngine.h"
 
 namespace utils::math {
-    void LorenzAttractor::mixSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed) {
-        double x = USE_ENHANCED_LORENZ_INITIAL_VALUES ? 1.01 : 1.0;
-        double y = USE_ENHANCED_LORENZ_INITIAL_VALUES ? 1.02 : 1.0;
-        double z = USE_ENHANCED_LORENZ_INITIAL_VALUES ? 1.03 : 1.0;
+    void LorenzAttractor::step(double &x, double &y, double &z, double dt) {
+        constexpr double sigma = 10.0;
+        constexpr double rho = 28.0;
         constexpr double beta = 8.0 / 3.0;
 
-        std::vector<uint8_t> lorenzEntropy;
-        lorenzEntropy.reserve(LORENZ_ENTROPY_STEPS * 3);
+        const double dx = sigma * (y - x);
+        const double dy = x * (rho - z) - y;
+        const double dz = x * y - beta * z;
 
-        for (size_t i = 0; i < 100; ++i) {
-            constexpr double dt = 0.01;
-            constexpr double rho = 28.0;
-            constexpr double sigma = 10.0;
-            const double dx = sigma * (y - x) * dt;
-            const double dy = (x * (rho - z) - y) * dt;
-            const double dz = (x * y - beta * z) * dt;
+        x += dx * dt;
+        y += dy * dt;
+        z += dz * dt;
+    }
 
-            x += dx;
-            y += dy;
-            z += dz;
+    void LorenzAttractor::generateEntropy(std::array<uint8_t, 32> &buffer, size_t size) {
+        double x = PARANOID_MODE ? 1.01 : 1.0;
+        double y = PARANOID_MODE ? 1.02 : 1.0;
+        double z = PARANOID_MODE ? 1.03 : 1.0;
 
-            lorenzEntropy.push_back(static_cast<uint8_t>(std::fmod(std::abs(x), 256.0)));
-            lorenzEntropy.push_back(static_cast<uint8_t>(std::fmod(std::abs(y), 256.0)));
-            lorenzEntropy.push_back(static_cast<uint8_t>(std::fmod(std::abs(z), 256.0)));
-        }
-
-        for (size_t i = 0; i < lorenzEntropy.size(); ++i) {
-            seed[i % 32] ^= lorenzEntropy[i];
+        for (size_t i = 0; i < size; ++i) {
+            double dt = 0.01;
+            step(x, y, z, dt);
+            buffer[i] = static_cast<uint8_t>(std::fmod(std::abs(x + y + z), 256));
         }
     }
-}
+} // namespace utils::math

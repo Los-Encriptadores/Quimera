@@ -1,29 +1,31 @@
-#ifndef LORENZ_ATTRACTOR_H
-#define LORENZ_ATTRACTOR_H
+#ifndef LORENZATTRACTOR_H
+#define LORENZATTRACTOR_H
 
 #include <array>
-#include <cstdint>
-#include <vector>
-
-#define LORENZ_ENTROPY_STEPS 100
-#define USE_ENHANCED_LORENZ_INITIAL_VALUES true
 
 namespace utils::math {
     /**
-     * @brief A class for mixing seeds with Lorenz entropy.
+     * @class LorenzAttractor
+     * @brief A class for generating entropy using the Lorenz attractor.
+     *
+     * This class simulates the Lorenz system to generate chaotic values that can be used as entropy.
      */
     class LorenzAttractor {
     public:
         /**
-         * @brief Mixes the provided seed with Lorenz entropy.
+         * @brief Generates entropy using the Lorenz attractor.
          *
-         * This method enhances the provided seed by mixing it with entropy derived from the
-         * Lorenz attractor. The enhanced seed provides better randomness for cryptographic purposes.
+         * This method uses the Lorenz equations to generate a chaotic sequence of values
+         * and stores them in the provided buffer.
          *
-         * @param seed A reference to the seed array to be mixed with Lorenz entropy.
+         * @param buffer The buffer to be filled with entropy values.
+         * @param size The size of the buffer.
          */
-        static void mixSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed);
+        static void generateEntropy(std::array<uint8_t, 32> &buffer, size_t size);
+
+    private:
+        static void step(double &x, double &y, double &z, double dt);
     };
 } // namespace utils::math
 
-#endif // LORENZ_ATTRACTOR_H
+#endif // LORENZATTRACTOR_H
