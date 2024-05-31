@@ -6,8 +6,10 @@
 
 #define PARANOID_MODE true
 #define POLYMORPHIC_KEY_SIZE 16
-#define CHUNK_SIZE 4096
+#define DEFAULT_CHUNK_SIZE 4096
 #define PADDING_BLOCK_SIZE 16
+#define MIN_REKEY_INTERVAL 100
+#define MAX_REKEY_INTERVAL 1000
 
 namespace engines::encryption {
  /**
@@ -25,7 +27,7 @@ namespace engines::encryption {
    *
    * Initializes the PolymorphicEncryptionEngine, generates the encryption key, and the XOR key.
    */
-  PolymorphicEncryptionEngine();
+  explicit PolymorphicEncryptionEngine(size_t chunkSize = DEFAULT_CHUNK_SIZE);
 
   /**
    * @brief Destroys the PolymorphicEncryptionEngine object.
@@ -59,6 +61,7 @@ namespace engines::encryption {
  private:
   unsigned char xor_key[POLYMORPHIC_KEY_SIZE]{}; /**< XOR key used for additional polymorphic encryption. */
   unsigned char *key{}; /**< Encryption key used for the primary encryption method. */
+  size_t chunkSize; /**< Size of the chunks used for encryption and decryption. */
 
   /**
    * @brief Generates the XOR key.
@@ -93,6 +96,6 @@ namespace engines::encryption {
    */
   void rekey(crypto_secretstream_xchacha20poly1305_state &state) const;
  };
-}
+} // namespace engines::encryption
 
 #endif // POLYMORPHICENCRYPTIONENGINE_H

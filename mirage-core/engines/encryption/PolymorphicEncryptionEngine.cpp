@@ -1,15 +1,12 @@
 #include "PolymorphicEncryptionEngine.h"
-
-#include <algorithm>
-#include <fstream>
-#include <iostream>
-#include <sodium.h>
-#include <vector>
-
 #include "../../utils/math/RNG.h"
+#include "../../utils/crypto/CryptoStateHandler.h"
+#include "../../file/FileHandler.h"
+#include <iostream>
 
 namespace engines::encryption {
-    PolymorphicEncryptionEngine::PolymorphicEncryptionEngine() {
+    PolymorphicEncryptionEngine::PolymorphicEncryptionEngine(const size_t chunkSize)
+        : chunkSize(chunkSize) {
         std::cout << "Initializing PolymorphicEncryptionEngine" << std::endl;
         if (sodium_init() == -1) {
             throw std::runtime_error("Failed to initialize libsodium");
@@ -32,31 +29,22 @@ namespace engines::encryption {
 
     void PolymorphicEncryptionEngine::encryptFile(const std::string &inputFilename,
                                                   const std::string &outputFilename) const {
-        std::ifstream inputFile(inputFilename, std::ios::binary);
-        std::ofstream outputFile(outputFilename, std::ios::binary);
-        if (!inputFile.is_open() || !outputFile.is_open()) {
-            throw std::runtime_error("Failed to open file for encryption");
-        }
+        file::FileHandler fileHandler(inputFilename, outputFilename);
+        utils::crypto::CryptoStateHandler cryptoStateHandler(key, fileHandler.outputFile);
 
-        std::vector<unsigned char> bufferIn(CHUNK_SIZE);
-        std::vector<unsigned char> bufferOut(CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES);
+        std::vector<unsigned char> bufferIn(chunkSize);
+        std::vector<unsigned char> bufferOut(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES);
         unsigned long long outLen;
-        size_t readLen;
-        int eof;
-        size_t paddedLen;
-
-        unsigned char header[crypto_secretstream_xchacha20poly1305_HEADERBYTES];
-        crypto_secretstream_xchacha20poly1305_state state;
-        crypto_secretstream_xchacha20poly1305_init_push(&state, header, key);
-        outputFile.write(reinterpret_cast<char *>(header), sizeof(header));
+        size_t readLen, paddedLen;
+        bool eof;
 
         size_t chunkCount = 0;
-        size_t rekeyInterval = PARANOID_MODE ? 10 : 50;
+        size_t rekeyInterval = PARANOID_MODE ? MIN_REKEY_INTERVAL : MAX_REKEY_INTERVAL;
 
         do {
-            inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
-            readLen = inputFile.gcount();
-            eof = inputFile.eof();
+            fileHandler.inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
+            readLen = fileHandler.inputFile.gcount();
+            eof = fileHandler.inputFile.eof();
 
             if (eof) {
                 if (sodium_pad(&paddedLen, bufferIn.data(), readLen, PADDING_BLOCK_SIZE, bufferIn.size()) != 0) {
@@ -67,57 +55,42 @@ namespace engines::encryption {
             }
 
             unsigned char tag = eof ? crypto_secretstream_xchacha20poly1305_TAG_FINAL : 0;
-            crypto_secretstream_xchacha20poly1305_push(&state, bufferOut.data(), &outLen, bufferIn.data(), paddedLen,
-                                                       nullptr, 0, tag);
+            crypto_secretstream_xchacha20poly1305_push(&cryptoStateHandler.getState(), bufferOut.data(), &outLen,
+                                                       bufferIn.data(), paddedLen, nullptr, 0, tag);
 
             xorBuffer(bufferOut.data(), outLen);
 
-            outputFile.write(reinterpret_cast<char *>(bufferOut.data()), outLen);
+            fileHandler.outputFile.write(reinterpret_cast<char *>(bufferOut.data()), outLen);
 
             if (++chunkCount % rekeyInterval == 0) {
-                rekey(state);
+                rekey(cryptoStateHandler.getState());
             }
         } while (!eof);
-
-        inputFile.close();
-        outputFile.close();
     }
 
     void PolymorphicEncryptionEngine::decryptFile(const std::string &inputFilename,
                                                   const std::string &outputFilename) const {
-        std::ifstream inputFile(inputFilename, std::ios::binary);
-        std::ofstream outputFile(outputFilename, std::ios::binary);
-        if (!inputFile.is_open() || !outputFile.is_open()) {
-            throw std::runtime_error("Failed to open file for decryption");
-        }
+        file::FileHandler fileHandler(inputFilename, outputFilename);
+        utils::crypto::CryptoStateHandler cryptoStateHandler(key, fileHandler.inputFile);
 
-        std::vector<unsigned char> bufferIn(CHUNK_SIZE + crypto_secretstream_xchacha20poly1305_ABYTES);
-        std::vector<unsigned char> bufferOut(CHUNK_SIZE + PADDING_BLOCK_SIZE);
+        std::vector<unsigned char> bufferIn(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES);
+        std::vector<unsigned char> bufferOut(chunkSize + PADDING_BLOCK_SIZE);
         unsigned long long outLen;
-        size_t readLen;
-        int eof;
-        size_t unpaddedLen;
-
-        unsigned char header[crypto_secretstream_xchacha20poly1305_HEADERBYTES];
-        crypto_secretstream_xchacha20poly1305_state state;
-
-        inputFile.read(reinterpret_cast<char *>(header), sizeof(header));
-        if (crypto_secretstream_xchacha20poly1305_init_pull(&state, header, key) != 0) {
-            throw std::runtime_error("Failed to initialize decryption stream");
-        }
+        size_t readLen, unpaddedLen;
+        bool eof;
 
         size_t chunkCount = 0;
-        size_t rekeyInterval = PARANOID_MODE ? 10 : 50;
+        size_t rekeyInterval = PARANOID_MODE ? MIN_REKEY_INTERVAL : MAX_REKEY_INTERVAL;
 
         do {
-            inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
-            readLen = inputFile.gcount();
-            eof = inputFile.eof();
+            fileHandler.inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
+            readLen = fileHandler.inputFile.gcount();
+            eof = fileHandler.inputFile.eof();
 
             xorBuffer(bufferIn.data(), readLen);
 
-            if (crypto_secretstream_xchacha20poly1305_pull(&state, bufferOut.data(), &outLen, nullptr, bufferIn.data(),
-                                                           readLen, nullptr, 0) != 0) {
+            if (crypto_secretstream_xchacha20poly1305_pull(&cryptoStateHandler.getState(), bufferOut.data(), &outLen,
+                                                           nullptr, bufferIn.data(), readLen, nullptr, 0) != 0) {
                 throw std::runtime_error("Decryption failed");
             }
 
@@ -125,18 +98,15 @@ namespace engines::encryption {
                 if (sodium_unpad(&unpaddedLen, bufferOut.data(), outLen, PADDING_BLOCK_SIZE) != 0) {
                     throw std::runtime_error("Unpadding failed");
                 }
-                outputFile.write(reinterpret_cast<char *>(bufferOut.data()), unpaddedLen);
+                fileHandler.outputFile.write(reinterpret_cast<char *>(bufferOut.data()), unpaddedLen);
             } else {
-                outputFile.write(reinterpret_cast<char *>(bufferOut.data()), outLen);
+                fileHandler.outputFile.write(reinterpret_cast<char *>(bufferOut.data()), outLen);
             }
 
             if (++chunkCount % rekeyInterval == 0) {
-                rekey(state);
+                rekey(cryptoStateHandler.getState());
             }
         } while (!eof);
-
-        inputFile.close();
-        outputFile.close();
     }
 
     void PolymorphicEncryptionEngine::generateEncryptionKey() {
@@ -161,13 +131,13 @@ namespace engines::encryption {
         }
     }
 
-    void PolymorphicEncryptionEngine::xorBuffer(unsigned char *buffer, size_t length) const {
+    inline void PolymorphicEncryptionEngine::xorBuffer(unsigned char *buffer, size_t length) const {
         for (size_t i = 0; i < length; ++i) {
             buffer[i] ^= xor_key[i % POLYMORPHIC_KEY_SIZE];
         }
     }
 
-    void PolymorphicEncryptionEngine::rekey(crypto_secretstream_xchacha20poly1305_state &state) const {
+    inline void PolymorphicEncryptionEngine::rekey(crypto_secretstream_xchacha20poly1305_state &state) const {
         crypto_secretstream_xchacha20poly1305_rekey(&state);
     }
-}
+} // namespace engines::encryption
