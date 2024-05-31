@@ -10,6 +10,7 @@
 
 #include "engines/encryption/PolymorphicEncryptionEngine.h"
 
+
 // Function to generate a test file with a random message
 void generateTestFile(const std::string &filename) {
     std::ofstream file(filename);
@@ -65,7 +66,7 @@ int main() {
         std::cout << "Generated test file: " << filename << std::endl;
 
         // Create the encryption engine instance
-        PolymorphicEncryptionEngine engine;
+        engines::encryption::PolymorphicEncryptionEngine engine;
 
         int choice;
         do {
