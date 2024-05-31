@@ -1,14 +1,11 @@
 #include "RNG.h"
+#include "LorenzAttractor.h"
 
 #include <algorithm>
-#include <cmath>
 #include <functional>
 #include <random>
 #include <sodium.h>
 #include <stdexcept>
-
-constexpr uint8_t LORENZ_ENTROPY_STEPS = 100;
-constexpr bool USE_ENHANCED_LORENZ_INITIAL_VALUES = true; // TODO: for now; we'll read it from config later.
 
 namespace utils::math {
     RNG::RNG() {
@@ -16,9 +13,9 @@ namespace utils::math {
             throw std::runtime_error("libsodium initialization failed");
         }
 
-        std::random_device rd;
         std::array<uint32_t, std::mt19937::state_size> seed_data{};
-        std::generate_n(seed_data.data(), seed_data.size(), std::ref(rd));
+        randombytes_buf(seed_data.data(), seed_data.size() * sizeof(uint32_t));
+
         std::seed_seq seq(seed_data.begin(), seed_data.end());
         rng_.seed(seq);
     }
@@ -43,7 +40,7 @@ namespace utils::math {
 
         std::generate_n(entropySeed, 32, std::ref(rng_));
 
-        std::transform(osSeed, osSeed + 32, entropySeed, seed.begin(), std::bit_xor<>());
+        std::transform(osSeed, osSeed + 32, entropySeed, seed.begin(), std::bit_xor());
 
         sodium_memzero(osSeed, 32);
         sodium_free(osSeed);
@@ -52,37 +49,6 @@ namespace utils::math {
         sodium_free(entropySeed);
 
         return seed;
-    }
-
-    void RNG::mixSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed) {
-        double x = USE_ENHANCED_LORENZ_INITIAL_VALUES ? 1.01 : 1.0;
-        double y = USE_ENHANCED_LORENZ_INITIAL_VALUES ? 1.02 : 1.0;
-        double z = USE_ENHANCED_LORENZ_INITIAL_VALUES ? 1.03 : 1.0;
-        constexpr double beta = 8.0 / 3.0;
-
-        std::vector<uint8_t> lorenzEntropy;
-        lorenzEntropy.reserve(LORENZ_ENTROPY_STEPS * 3);
-
-        for (size_t i = 0; i < LORENZ_ENTROPY_STEPS; ++i) {
-            constexpr double dt = 0.01;
-            constexpr double rho = 28.0;
-            constexpr double sigma = 10.0;
-            const double dx = sigma * (y - x) * dt;
-            const double dy = (x * (rho - z) - y) * dt;
-            const double dz = (x * y - beta * z) * dt;
-
-            x += dx;
-            y += dy;
-            z += dz;
-
-            lorenzEntropy.push_back(static_cast<uint8_t>(std::fmod(std::abs(x), 256.0)));
-            lorenzEntropy.push_back(static_cast<uint8_t>(std::fmod(std::abs(y), 256.0)));
-            lorenzEntropy.push_back(static_cast<uint8_t>(std::fmod(std::abs(z), 256.0)));
-        }
-
-        for (size_t i = 0; i < lorenzEntropy.size(); ++i) {
-            seed[i % 32] ^= lorenzEntropy[i];
-        }
     }
 
     template<typename T>
@@ -104,7 +70,7 @@ namespace utils::math {
         sodium_mprotect_readwrite(buffer);
 
         std::array<uint8_t, 32> seed = generateSeed();
-        mixSeedWithLorenzEntropy(seed);
+        LorenzAttractor::mixSeedWithLorenzEntropy(seed);
         std::ranges::shuffle(seed, rng_);
         fillBufferWithRandomBytes(buffer, sizeof(T) * count);
 

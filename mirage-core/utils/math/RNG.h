@@ -51,16 +51,6 @@ namespace utils::math {
   std::array<uint8_t, 32> generateSeed();
 
   /**
-   * @brief Mixes the generated seed with Lorenz entropy.
-   *
-   * This method enhances the provided seed by mixing it with entropy derived from the
-   * Lorenz attractor. The enhanced seed provides better randomness for cryptographic purposes.
-   *
-   * @param seed A reference to the seed array to be mixed with Lorenz entropy.
-   */
-  static void mixSeedWithLorenzEntropy(std::array<uint8_t, 32> &seed);
-
-  /**
    * @brief Fills a buffer with random bytes.
    *
    * This method fills the provided buffer with random bytes using a uniform distribution.
