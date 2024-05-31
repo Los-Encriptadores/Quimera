@@ -2,21 +2,22 @@
 #define POLYMORPHICENCRYPTIONENGINE_H
 
 #include <string>
+#include <sodium/crypto_secretstream_xchacha20poly1305.h>
 
+#define PARANOID_MODE true
 #define POLYMORPHIC_KEY_SIZE 16
 #define CHUNK_SIZE 4096
 #define PADDING_BLOCK_SIZE 16
 
-
 namespace engines::encryption {
  /**
- * @class PolymorphicEncryptionEngine
- * @brief This class provides methods for encryption and decryption of files using a polymorphic encryption.
- *
- * The PolymorphicEncryptionEngine class uses an encryption module combined with XOR operations
- * to add a layer of polymorphism on top of the encryption. This ensures enhanced security by applying
- * an additional XOR-based transformation to the encrypted data.
- */
+  * @class PolymorphicEncryptionEngine
+  * @brief This class provides methods for encryption and decryption of files using a polymorphic encryption.
+  *
+  * The PolymorphicEncryptionEngine class uses an encryption module combined with XOR operations
+  * to add a layer of polymorphism on top of the encryption. This ensures enhanced security by applying
+  * an additional XOR-based transformation to the encrypted data.
+  */
  class PolymorphicEncryptionEngine final {
  public:
   /**
@@ -62,16 +63,16 @@ namespace engines::encryption {
   /**
    * @brief Generates the XOR key.
    *
-   * Generates a random XOR key using libsodium.
+   * Generates a random XOR key using the custom RNG.
    */
   void generateXorKey();
 
   /**
    * @brief Generates the encryption key.
    *
-   * Allocates and initializes the encryption key using libsodium.
+   * Allocates and initializes the encryption key using the custom RNG.
    */
-  void generateKey();
+  void generateEncryptionKey();
 
   /**
    * @brief Applies an XOR operation to a buffer.
@@ -82,8 +83,16 @@ namespace engines::encryption {
    * @param length The length of the buffer.
    */
   void xorBuffer(unsigned char *buffer, size_t length) const;
+
+  /**
+   * @brief Rekeys the encryption state.
+   *
+   * Updates the encryption state with a new key.
+   *
+   * @param state The current encryption state.
+   */
+  void rekey(crypto_secretstream_xchacha20poly1305_state &state) const;
  };
 }
-
 
 #endif // POLYMORPHICENCRYPTIONENGINE_H

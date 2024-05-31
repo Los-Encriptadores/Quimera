@@ -6,6 +6,8 @@
 #include <sodium.h>
 #include <vector>
 
+#include "../../utils/math/RNG.h"
+
 namespace engines::encryption {
     PolymorphicEncryptionEngine::PolymorphicEncryptionEngine() {
         std::cout << "Initializing PolymorphicEncryptionEngine" << std::endl;
@@ -13,7 +15,7 @@ namespace engines::encryption {
             throw std::runtime_error("Failed to initialize libsodium");
         }
 
-        generateKey();
+        generateEncryptionKey();
         generateXorKey();
 
         std::cout << "PolymorphicEncryptionEngine initialized" << std::endl;
@@ -48,6 +50,9 @@ namespace engines::encryption {
         crypto_secretstream_xchacha20poly1305_init_push(&state, header, key);
         outputFile.write(reinterpret_cast<char *>(header), sizeof(header));
 
+        size_t chunkCount = 0;
+        size_t rekeyInterval = PARANOID_MODE ? 10 : 50;
+
         do {
             inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
             readLen = inputFile.gcount();
@@ -68,6 +73,10 @@ namespace engines::encryption {
             xorBuffer(bufferOut.data(), outLen);
 
             outputFile.write(reinterpret_cast<char *>(bufferOut.data()), outLen);
+
+            if (++chunkCount % rekeyInterval == 0) {
+                rekey(state);
+            }
         } while (!eof);
 
         inputFile.close();
@@ -97,6 +106,9 @@ namespace engines::encryption {
             throw std::runtime_error("Failed to initialize decryption stream");
         }
 
+        size_t chunkCount = 0;
+        size_t rekeyInterval = PARANOID_MODE ? 10 : 50;
+
         do {
             inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
             readLen = inputFile.gcount();
@@ -117,29 +129,45 @@ namespace engines::encryption {
             } else {
                 outputFile.write(reinterpret_cast<char *>(bufferOut.data()), outLen);
             }
+
+            if (++chunkCount % rekeyInterval == 0) {
+                rekey(state);
+            }
         } while (!eof);
 
         inputFile.close();
         outputFile.close();
     }
 
-    void PolymorphicEncryptionEngine::generateKey() {
+    void PolymorphicEncryptionEngine::generateEncryptionKey() {
         key = static_cast<unsigned char *>(sodium_malloc(crypto_secretstream_xchacha20poly1305_KEYBYTES));
         if (!key) {
             throw std::bad_alloc();
         }
         sodium_mprotect_readwrite(key);
-        crypto_secretstream_xchacha20poly1305_keygen(key);
+
+        utils::math::RNG rng;
+        for (size_t i = 0; i < crypto_secretstream_xchacha20poly1305_KEYBYTES; ++i) {
+            key[i] = rng.random<uint8_t>();
+        }
+
         sodium_mprotect_readonly(key);
     }
 
     void PolymorphicEncryptionEngine::generateXorKey() {
-        randombytes_buf(xor_key, POLYMORPHIC_KEY_SIZE);
+        utils::math::RNG rng;
+        for (unsigned char &i: xor_key) {
+            i = rng.random<uint8_t>();
+        }
     }
 
     void PolymorphicEncryptionEngine::xorBuffer(unsigned char *buffer, size_t length) const {
         for (size_t i = 0; i < length; ++i) {
             buffer[i] ^= xor_key[i % POLYMORPHIC_KEY_SIZE];
         }
+    }
+
+    void PolymorphicEncryptionEngine::rekey(crypto_secretstream_xchacha20poly1305_state &state) const {
+        crypto_secretstream_xchacha20poly1305_rekey(&state);
     }
 }
