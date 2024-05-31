@@ -1,10 +1,11 @@
 #include "RNG.h"
-#include <random>
+
 #include <algorithm>
-#include <functional>
-#include <stdexcept>
 #include <cmath>
+#include <functional>
+#include <random>
 #include <sodium.h>
+#include <stdexcept>
 
 constexpr uint8_t LORENZ_ENTROPY_STEPS = 100;
 constexpr bool USE_ENHANCED_LORENZ_INITIAL_VALUES = true; // TODO: for now; we'll read it from config later.
@@ -25,7 +26,6 @@ namespace utils::math {
     std::array<uint8_t, 32> RNG::generateSeed() {
         std::array<uint8_t, 32> seed{};
 
-        // Allocate memory for osSeed and entropySeed using sodium_malloc
         auto *osSeed = static_cast<uint8_t *>(sodium_malloc(32));
         if (!osSeed) {
             throw std::bad_alloc();
@@ -97,7 +97,6 @@ namespace utils::math {
     T RNG::random(const size_t count) {
         static_assert(std::is_integral_v<T>, "T must be an integral type");
 
-        // Allocate memory for buffer using sodium_malloc
         auto *buffer = static_cast<uint8_t *>(sodium_malloc(sizeof(T) * count));
         if (!buffer) {
             throw std::bad_alloc();
@@ -120,7 +119,6 @@ namespace utils::math {
         return result;
     }
 
-    // Explicit instantiation for uint8_t and other types as needed
     template uint8_t RNG::random<uint8_t>(size_t count);
 
     template uint16_t RNG::random<uint16_t>(size_t count);
