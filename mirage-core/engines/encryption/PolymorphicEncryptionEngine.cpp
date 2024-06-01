@@ -35,7 +35,7 @@ namespace engines::encryption {
         std::vector<unsigned char> bufferIn(chunkSize);
         std::vector<unsigned char> bufferOut(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES);
         unsigned long long outLen;
-        size_t readLen, paddedLen;
+        size_t paddedLen;
         bool eof = false;
 
         size_t chunkCount = 0;
@@ -43,7 +43,7 @@ namespace engines::encryption {
 
         while (!eof) {
             fileHandler.inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
-            readLen = fileHandler.inputFile.gcount();
+            const size_t readLen = fileHandler.inputFile.gcount();
             eof = fileHandler.inputFile.eof();
 
             if (eof) {
@@ -54,7 +54,7 @@ namespace engines::encryption {
                 paddedLen = readLen;
             }
 
-            unsigned char tag = eof ? crypto_secretstream_xchacha20poly1305_TAG_FINAL : 0;
+            const unsigned char tag = eof ? crypto_secretstream_xchacha20poly1305_TAG_FINAL : 0;
             crypto_secretstream_xchacha20poly1305_push(&cryptoStateHandler.getState(), bufferOut.data(), &outLen,
                                                        bufferIn.data(), paddedLen, nullptr, 0, tag);
 
@@ -76,7 +76,7 @@ namespace engines::encryption {
         std::vector<unsigned char> bufferIn(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES);
         std::vector<unsigned char> bufferOut(chunkSize + PADDING_BLOCK_SIZE);
         unsigned long long outLen;
-        size_t readLen, unpaddedLen;
+        size_t unpaddedLen;
         bool eof = false;
 
         size_t chunkCount = 0;
@@ -84,7 +84,7 @@ namespace engines::encryption {
 
         while (!eof) {
             fileHandler.inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
-            readLen = fileHandler.inputFile.gcount();
+            const size_t readLen = fileHandler.inputFile.gcount();
             eof = fileHandler.inputFile.eof();
 
             xorBuffer(bufferIn.data(), readLen);
@@ -131,7 +131,7 @@ namespace engines::encryption {
         }
     }
 
-    inline void PolymorphicEncryptionEngine::xorBuffer(unsigned char *buffer, size_t length) const {
+    inline void PolymorphicEncryptionEngine::xorBuffer(unsigned char *buffer, const size_t length) const {
         for (size_t i = 0; i < length; ++i) {
             buffer[i] ^= xor_key[i % POLYMORPHIC_KEY_SIZE];
         }
