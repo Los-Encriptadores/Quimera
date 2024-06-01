@@ -95,6 +95,16 @@ namespace engines::encryption {
    * @param state The current encryption state.
    */
   void rekey(crypto_secretstream_xchacha20poly1305_state &state) const;
+
+  /**
+  * @brief Generates a mask noise.
+  *
+  * Generates a random noise mask of the specified length using the randombytes_buf function.
+  *
+  * @param noise The noise buffer to be generated.
+  * @param length The length of the noise buffer.
+  */
+  void generateMaskNoise(std::vector<unsigned char> &noise, size_t length) const;
  };
 } // namespace engines::encryption
 

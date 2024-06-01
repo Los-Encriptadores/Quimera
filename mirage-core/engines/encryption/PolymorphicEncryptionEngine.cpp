@@ -33,7 +33,8 @@ namespace engines::encryption {
         utils::crypto::CryptoStateHandler cryptoStateHandler(key, fileHandler.outputFile);
 
         std::vector<unsigned char> bufferIn(chunkSize);
-        std::vector<unsigned char> bufferOut(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES);
+        std::vector<unsigned char> bufferOut(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES + chunkSize / 2);
+        std::vector<unsigned char> noiseBuffer(chunkSize / 2);
         unsigned long long outLen;
         size_t paddedLen;
         bool eof = false;
@@ -58,9 +59,12 @@ namespace engines::encryption {
             crypto_secretstream_xchacha20poly1305_push(&cryptoStateHandler.getState(), bufferOut.data(), &outLen,
                                                        bufferIn.data(), paddedLen, nullptr, 0, tag);
 
-            xorBuffer(bufferOut.data(), outLen);
+            generateMaskNoise(noiseBuffer, noiseBuffer.size());
+            for (size_t i = 0; i < noiseBuffer.size(); ++i) {
+                bufferOut[outLen + i] = noiseBuffer[i];
+            }
 
-            fileHandler.outputFile.write(reinterpret_cast<char *>(bufferOut.data()), outLen);
+            fileHandler.outputFile.write(reinterpret_cast<char *>(bufferOut.data()), outLen + noiseBuffer.size());
 
             if (++chunkCount % rekeyInterval == 0) {
                 rekey(cryptoStateHandler.getState());
@@ -68,12 +72,13 @@ namespace engines::encryption {
         }
     }
 
+
     void PolymorphicEncryptionEngine::decryptFile(const std::string &inputFilename,
                                                   const std::string &outputFilename) const {
         file::FileHandler fileHandler(inputFilename, outputFilename);
         utils::crypto::CryptoStateHandler cryptoStateHandler(key, fileHandler.inputFile);
 
-        std::vector<unsigned char> bufferIn(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES);
+        std::vector<unsigned char> bufferIn(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES + chunkSize / 2);
         std::vector<unsigned char> bufferOut(chunkSize + PADDING_BLOCK_SIZE);
         unsigned long long outLen;
         size_t unpaddedLen;
@@ -87,10 +92,11 @@ namespace engines::encryption {
             const size_t readLen = fileHandler.inputFile.gcount();
             eof = fileHandler.inputFile.eof();
 
-            xorBuffer(bufferIn.data(), readLen);
+            const size_t noiseStart = readLen - chunkSize / 2;
+            std::fill(bufferIn.begin() + noiseStart, bufferIn.end(), 0);
 
             if (crypto_secretstream_xchacha20poly1305_pull(&cryptoStateHandler.getState(), bufferOut.data(), &outLen,
-                                                           nullptr, bufferIn.data(), readLen, nullptr, 0) != 0) {
+                                                           nullptr, bufferIn.data(), noiseStart, nullptr, 0) != 0) {
                 throw std::runtime_error("Decryption failed");
             }
 
@@ -108,6 +114,7 @@ namespace engines::encryption {
             }
         }
     }
+
 
     void PolymorphicEncryptionEngine::generateEncryptionKey() {
         key = static_cast<unsigned char *>(sodium_malloc(crypto_secretstream_xchacha20poly1305_KEYBYTES));
@@ -139,5 +146,10 @@ namespace engines::encryption {
 
     inline void PolymorphicEncryptionEngine::rekey(crypto_secretstream_xchacha20poly1305_state &state) const {
         crypto_secretstream_xchacha20poly1305_rekey(&state);
+    }
+
+    void PolymorphicEncryptionEngine::generateMaskNoise(std::vector<unsigned char> &noise, const size_t length) const {
+        noise.resize(length);
+        randombytes_buf(noise.data(), length);
     }
 } // namespace engines::encryption
