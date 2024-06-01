@@ -36,12 +36,12 @@ namespace engines::encryption {
         std::vector<unsigned char> bufferOut(chunkSize + crypto_secretstream_xchacha20poly1305_ABYTES);
         unsigned long long outLen;
         size_t readLen, paddedLen;
-        bool eof;
+        bool eof = false;
 
         size_t chunkCount = 0;
         size_t rekeyInterval = PARANOID_MODE ? MIN_REKEY_INTERVAL : MAX_REKEY_INTERVAL;
 
-        do {
+        while (!eof) {
             fileHandler.inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
             readLen = fileHandler.inputFile.gcount();
             eof = fileHandler.inputFile.eof();
@@ -65,7 +65,7 @@ namespace engines::encryption {
             if (++chunkCount % rekeyInterval == 0) {
                 rekey(cryptoStateHandler.getState());
             }
-        } while (!eof);
+        }
     }
 
     void PolymorphicEncryptionEngine::decryptFile(const std::string &inputFilename,
@@ -77,12 +77,12 @@ namespace engines::encryption {
         std::vector<unsigned char> bufferOut(chunkSize + PADDING_BLOCK_SIZE);
         unsigned long long outLen;
         size_t readLen, unpaddedLen;
-        bool eof;
+        bool eof = false;
 
         size_t chunkCount = 0;
         size_t rekeyInterval = PARANOID_MODE ? MIN_REKEY_INTERVAL : MAX_REKEY_INTERVAL;
 
-        do {
+        while (!eof) {
             fileHandler.inputFile.read(reinterpret_cast<char *>(bufferIn.data()), bufferIn.size());
             readLen = fileHandler.inputFile.gcount();
             eof = fileHandler.inputFile.eof();
@@ -106,7 +106,7 @@ namespace engines::encryption {
             if (++chunkCount % rekeyInterval == 0) {
                 rekey(cryptoStateHandler.getState());
             }
-        } while (!eof);
+        }
     }
 
     void PolymorphicEncryptionEngine::generateEncryptionKey() {
