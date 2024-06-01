@@ -16,11 +16,15 @@ namespace file {
     public:
         std::ifstream inputFile; /**< Input file stream for reading data. */
         std::ofstream outputFile; /**< Output file stream for writing data. */
+        int inputFd; /**< File descriptor for the input file. */
+        size_t fileSize; /**< Size of the input file. */
+        const unsigned char *fileData; /**< Memory-mapped data of the input file. */
 
         /**
          * @brief Constructs a new FileHandler object.
          *
          * Opens the specified input and output files. Throws an exception if the files cannot be opened.
+         * Also maps the input file into memory for efficient reading.
          *
          * @param inputFilename The path to the input file.
          * @param outputFilename The path to the output file.
@@ -30,7 +34,7 @@ namespace file {
         /**
          * @brief Destroys the FileHandler object.
          *
-         * Ensures that the input and output files are properly closed.
+         * Ensures that the input and output files are properly closed and unmapped.
          */
         ~FileHandler();
     };
