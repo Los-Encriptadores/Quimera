@@ -31,7 +31,7 @@ namespace utils::math {
         LorenzAttractor::generateEntropy(lorenzEntropy, 32);
 
         // Mix OS entropy with Lorenz attractor entropy
-        std::transform(osSeed, osSeed + 32, lorenzEntropy.begin(), seed.begin(), std::bit_xor<>());
+        std::transform(osSeed, osSeed + 32, lorenzEntropy.begin(), seed.begin(), std::bit_xor());
 
         return seed;
     }
