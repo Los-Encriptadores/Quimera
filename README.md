@@ -1,5 +1,8 @@
 # Polymorphic Encryption Engine (mirage-core) 🔒 [POC/WIP]
 
+# PREVIEW_ONLY 2-JUNE-2024
+I realized that such project would need extra care, consideration and management; for the sake of proper structure (I don't want to deump everything and make a mess); I moved it to [Quimera](https://github.com/Los-Encriptadores/Quimera), I'm planning on enforcing a structure to projects like this for the sake of research and moral.
+
 ## Overview
 
 This project implements a polymorphic encryption engine using the Libsodium library for secure encryption and decryption of files. The engine employs an additional XOR-based transformation to enhance security, providing a polymorphic layer on top of the standard encryption methods.
